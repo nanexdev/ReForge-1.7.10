@@ -4,7 +4,7 @@ buildscript {
         mavenLocal()
         maven {
             name = "forge"
-            url = "http://files.minecraftforge.net/maven"
+            url = "https://maven.minecraftforge.net/"
         }
         maven {
             name = "sonatype"
@@ -16,11 +16,12 @@ buildscript {
     }
 }
 
+import static net.minecraftforge.gradle.dev.ForgeDevPlugin.*
+
 configurations {
     deployJars
 }
 
-import static net.minecraftforge.gradle.dev.ForgeDevPlugin.*
 
 apply plugin: 'maven'
 apply plugin: 'forgedev'
@@ -40,6 +41,111 @@ minecraft {
     mainClass = 'cpw.mods.fml.relauncher.ServerLaunchWrapper'
     tweakClass = 'cpw.mods.fml.common.launcher.FMLTweaker'
     installerVersion = "1.4"
+}
+
+// Fix dead Mojang S3 download URLs - redirect to current Mojang CDN
+project.afterEvaluate {
+    def mcCacheDir = new File(gradle.gradleUserHomeDir, 'caches/minecraft/net/minecraft')
+    
+    tasks.findByName('downloadClient')?.with {
+        actions.clear()
+        doLast {
+            def dest = new File(mcCacheDir, "minecraft/1.7.10/minecraft-1.7.10.jar")
+            if (!dest.exists() || dest.length() == 0) {
+                dest.parentFile.mkdirs()
+                new URL("https://launcher.mojang.com/v1/objects/e80d9b3bf5085002218d4be59e668bac718abbc6/client.jar").withInputStream { is ->
+                    dest.withOutputStream { os -> os << is }
+                }
+                logger.lifecycle("Downloaded MC 1.7.10 client jar (${dest.length()} bytes)")
+            }
+        }
+    }
+    
+    tasks.findByName('downloadServer')?.with {
+        actions.clear()
+        doLast {
+            def dest = new File(mcCacheDir, "minecraft_server/1.7.10/minecraft_server-1.7.10.jar")
+            if (!dest.exists() || dest.length() == 0) {
+                dest.parentFile.mkdirs()
+                new URL("https://launcher.mojang.com/v1/objects/952438ac4e01b4d115c5fc38f891710c4941df29/server.jar").withInputStream { is ->
+                    dest.withOutputStream { os -> os << is }
+                }
+                logger.lifecycle("Downloaded MC 1.7.10 server jar (${dest.length()} bytes)")
+            }
+        }
+    }
+    
+    tasks.findByName('updateJson')?.with {
+        actions.clear()
+        doLast {
+            def dest = new File(mcCacheDir, "minecraft_json/1.7.10/1.7.10.json")
+            if (!dest.exists() || dest.length() == 0) {
+                dest.parentFile.mkdirs()
+                new URL("https://piston-meta.mojang.com/v1/packages/ed5d8789ed29872ea2ef1c348302b0c55e3f3468/1.7.10.json").withInputStream { is ->
+                    dest.withOutputStream { os -> os << is }
+                }
+                logger.lifecycle("Downloaded MC 1.7.10 version JSON (${dest.length()} bytes)")
+            }
+        }
+    }
+
+    // Fix dead HTTP installer URL - redirect to HTTPS Forge maven
+    tasks.findByName('downloadBaseInstaller')?.with {
+        actions.clear()
+        doLast {
+            def dest = new File(project.buildDir, "tmp/installer_base.1.4.jar")
+            if (!dest.exists() || dest.length() < 100) {
+                dest.parentFile.mkdirs()
+                new URL("https://maven.minecraftforge.net/net/minecraftforge/installer/1.4/installer-1.4-shrunk.jar").withInputStream { is ->
+                    dest.withOutputStream { os -> os << is }
+                }
+                logger.lifecycle("Downloaded installer_base.1.4.jar (${dest.length()} bytes)")
+            }
+        }
+    }
+
+    // Replace generateInstallJson: do token substitution without contacting dead CI server
+    tasks.findByName('generateInstallJson')?.with {
+        actions.clear()
+        doLast {
+            def mcVer    = project.minecraft.version
+            def forgeVer = project.version
+            def ts       = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ").format(new Date())
+            def tokens   = [
+                '@minecraft_version@' : mcVer,
+                '@project@'           : 'Forge',
+                '@version@'           : forgeVer,
+                '@artifact@'          : "net.minecraftforge:forge:${mcVer}-${forgeVer}",
+                '@universal_jar@'     : "forge-${mcVer}-${forgeVer}-universal.jar",
+                '@timestamp@'         : ts,
+            ]
+            def src  = file('fml/jsons/1.7.10-rel.json')
+            def out  = new File(project.buildDir, 'tmp/install_profile.json')
+            out.parentFile.mkdirs()
+            def text = src.text
+            tokens.each { k, v -> text = text.replace(k, v) }
+            out.text = text
+            logger.lifecycle "Generated install_profile.json"
+        }
+    }
+
+    // Bypass dead CI server in createChangelog (ChangelogTask)
+    tasks.findByName('createChangelog')?.with {
+        actions.clear()
+        doLast { /* no-op: ci.jenkins.minecraftforge.net is dead */ }
+    }
+
+    // Ensure installer_base is valid before packageInstaller expands it
+    tasks.findByName('packageInstaller')?.doFirst {
+        def installerBase = new File(project.buildDir, "tmp/installer_base.1.4.jar")
+        if (!installerBase.exists() || installerBase.length() < 100) {
+            installerBase.parentFile.mkdirs()
+            new URL("https://maven.minecraftforge.net/net/minecraftforge/installer/1.4/installer-1.4-shrunk.jar").withInputStream { is ->
+                installerBase.withOutputStream { os -> os << is }
+            }
+            logger.lifecycle("Re-downloaded installer_base.1.4.jar (${installerBase.length()} bytes)")
+        }
+    }
 }
 
 group = 'net.minecraftforge'

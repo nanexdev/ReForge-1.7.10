@@ -1,3 +1,22 @@
+README: Reforge (Minecraft 1.7.10)
+
+Welcome to Reforge, a modernized fork of the Minecraft Forge 10.13.4.1614 build for Minecraft 1.7.10. Reforge aims to breathe new life into the 1.7.10 ecosystem by providing the performance enhancements and stability fixes required by modern hardware and complex modpacks.
+
+Reforge is an unofficial, high-performance fork of the original Forge project. While it maintains 100% compatibility with existing 1.7.10 Forge mods, it replaces the aging internal logic with modern optimizations found in newer versions of Minecraft and standalone performance mods.
+Key Features:
+
+    Modern Rendering Pipeline: Backports logic from modern rendering engines to reduce CPU overhead.
+
+    Asynchronous Multi-threading: Moves chunk loading and data processing to background threads, significantly reducing "world lag" and TPS spikes.
+
+    Enhanced Fullscreen Handling: Replaces the buggy legacy fullscreen mode with a stable, modern implementation that supports Borderless Windowed mode and prevents crashing when ALT+TABbing.
+
+    Optimized Atlas Stitching: Improves the way textures are compiled into the game’s sprite sheets (atlases), reducing RAM usage and decreasing initial loading times for heavy modpacks.
+
+    Modern Java Support: Provides better out-of-the-box compatibility with Java 8 (latest builds) and experimental support for newer JDKs.
+
+    Built-in Mixin Support: Includes a native Mixin bootstrap to ensure compatibility with modern performance mods like Angelica or FalseTweaks.
+
 *** HOW TO INSTALL ***
 For Mod Users:
 
